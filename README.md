@@ -61,7 +61,12 @@ a matching lookup address will be sent to the catchall address:
 catchall: someone@example.com
 ```
 
-To create the aliases DBM, simply execute this command:
+The return address of anonymized messages is encoded in the `Reply-To` when the
+original message is forwarded, this means a catchall address will masquerade
+as whatever the `To` address was in the original email.  The address database
+is not used for lookups for masquerading, only forwarding.
+
+To create the address aliases DBM, simply execute this command:
 
 `remailer.py --config /path/to/your/config.yml --makedb < address_list`
 
