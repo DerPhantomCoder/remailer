@@ -4,9 +4,10 @@ import email
 from email import policy
 from email.parser import BytesFeedParser
 from smtplib import SMTP
+import logging
 import argparse
 import yaml
-import dbm
+from dbm import gnu as gdbm
 import sys
 import re
 import base64
@@ -37,6 +38,15 @@ class Remailer:
     trigger_string = 'anonymize'
     catchall_address = 'catchall'
 
+    def init_log(self, log:str = None):
+
+        if log is None:
+            filename = '/tmp/remailer.log'
+        else:
+            filename = log
+
+        logging.basicConfig(filename=filename, encoding='utf-8', level=logging.DEBUG)
+
     def load_config(self, path: str):
         try:
             if path is not None:
@@ -66,7 +76,7 @@ class Remailer:
             lookup_addr = self.to_addr
 
         try:
-            with dbm.open(self.config['map']) as db:
+            with gdbm.open(self.config['map'],'ruf') as db:
                 
                 if lookup_addr not in db:
                     if self.catchall_address not in db:
@@ -90,7 +100,7 @@ class Remailer:
 
     def makedb(self):
         try:
-            with dbm.open(self.config['map'],flag='n') as db:
+            with gdbm.open(self.config['map'],'n') as db:
                 for line in sys.stdin:
                     (email_in,email_out)=line.split(':')
                     db[email_in.strip()]=email_out.strip()
@@ -163,7 +173,7 @@ class Remailer:
 
                     message.add_header("Reply-To", to + '+' + self.trigger_string + '.' + encoded_to + '.' + encoded_from + '@' + domain)
 
-            message.add_header('X-Original-To', msg['To'])
+            message.add_header('Resent-From', message['To'])
             message.replace_header('To', recipient)
 
             message.add_header("X-Phantom-Remailer","yes")
@@ -247,7 +257,6 @@ incoming_address@domain.com: forwarding_address@domain.com''')
         print(remailer.last_exception)
         sys.exit(remailer.return_code)
 
-    print(remailer.config)
     if args.makedb:
         ret = remailer.makedb()
 
@@ -266,7 +275,7 @@ incoming_address@domain.com: forwarding_address@domain.com''')
                 recipient = remailer.lookup_forward()
 
                 if recipient == False:
-                    print(remailer.last_exception)
+                    print('No recipient found')
                     sys.exit(remailer.return_code)
 
                 ret = remailer.forward_message(message,recipient)

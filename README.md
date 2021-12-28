@@ -87,3 +87,9 @@ are properly handled.
 
 The EX_TEMPFAIL return code will cause sendmail to hold the message in deferred
 state so it can be reprocessed, this may be the desired default in many cases.
+
+## SELinux
+When using SELinux there are a few things to consider:
+- Ensure that your configuration and aliases database are readable by user `mail`
+- Use `restorecon -Frv` on the directory where your config/alias db resides to ensure they are labeled properly
+- Run `setsebool -P domain_can_mmap_files 1` to allow the DBM library to `mmap(2)` the aliases db
