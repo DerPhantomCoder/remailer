@@ -38,7 +38,8 @@ The pipe command looks like this:
 The remailer uses a YAML config with the following configuration settings:
 
 - map: The DBM file containing the map of the incoming and forwarding email
-addresses - smtp_host: The SMTP host to use as a relay for the remailer
+addresses
+- smtp_host: The SMTP host to use as a relay for the remailer
 
 ## Address alias database
 The remailer has another option `--makedb` which creates the DBM aliases file.
