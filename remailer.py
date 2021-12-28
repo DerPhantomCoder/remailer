@@ -190,8 +190,8 @@ class Remailer:
 
         self.message.set_content(self.strip_signature(content),subtype='plain',cte='quoted-printable')
 
-    def get_smtp_host(smtp_host: str = None):
-        return smtp_host if smtp_host is not None else self.config.smtp_host
+    def get_smtp_host(self, smtp_host: str = None):
+        return smtp_host if smtp_host is not None else self.config['smtp_host']
 
     def send_message(self, smtp_host: str = None):
         if debug == False:
@@ -239,6 +239,7 @@ incoming_address@domain.com: forwarding_address@domain.com''')
         print(remailer.last_exception)
         sys.exit(remailer.return_code)
 
+    print(remailer.config)
     if args.makedb:
         ret = remailer.makedb()
 
