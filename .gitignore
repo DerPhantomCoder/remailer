@@ -1,2 +1,4 @@
 *.eml
 out*
+address_list
+addresses.dbm

@@ -1,0 +1,2 @@
+map: addresses.dbm
+smtp_host: localhost
