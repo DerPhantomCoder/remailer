@@ -34,6 +34,25 @@ The pipe command looks like this:
 
 `|/usr/local/bin/remailer.py --config /etc/mail/remailer.yml`
 
+## smrsh
+
+Sendmail uses a wrapper called `smrsh` to deliver mail to programs.
+
+smrsh uses a explicit permissions model to allow programs to be executed, therefore
+you must create symlinks to `python3` and the `remailer.py` script in the
+`/etc/smrsh` directory.
+
+eg:
+
+```
+lrwxrwxrwx. 1 root root 16 Dec 22 15:28 python3 -> /usr/bin/python3
+lrwxrwxrwx. 1 root root 26 Dec 22 15:28 remailer.py -> /usr/local/bin/remailer.py
+```
+
+It is good practice to also relabel those symlinks after you create them:
+
+`restorecon -Frv /etc/smrsh`
+
 ## Config
 The remailer uses a YAML config with the following configuration settings:
 
