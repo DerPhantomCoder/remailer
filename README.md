@@ -3,7 +3,7 @@
 This is a masquerading (ne pseudonymous) remailer script that is designed to work with sendmail.
 
 ## Usage
-To use this you want to either put the remailer.py in your .forward or create an aliase in /etc/aliases.
+To use this you want to either put the remailer.py in your .forward or create an alias in /etc/aliases.
 
 The pipe command looks like this:
 
@@ -31,7 +31,7 @@ To create the aliases DBM, simply execute this command:
 `remailer.py --config /path/to/your/config.yml --makedb < address_list`
 
 ## Errors
-The remailer implements the Sendmail standard return codes used by mail delivery agents.  These are found in `/usr/includ/sysexits.h` but have no Python equivalent.
+The remailer implements the Sendmail standard return codes used by mail delivery agents.  These are found in `/usr/include/sysexits.h` but have no Python equivalent.
 
 I included the appropriate defines taken from the aforementioned header file.  If you extend functionality then be mindful of the exit codes and choose an appropriate one.
 
