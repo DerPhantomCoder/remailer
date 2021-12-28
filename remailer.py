@@ -2,6 +2,7 @@
 
 import email
 from email import policy
+from email.parser import BytesFeedParser
 from smtplib import SMTP
 import argparse
 import yaml
@@ -34,6 +35,7 @@ class Remailer:
     EX_CONFIG      = 78      #/* configuration error */
 
     trigger_string = 'anonymize'
+    catchall_address = 'catchall'
 
     def load_config(self, path: str):
         try:
@@ -67,8 +69,11 @@ class Remailer:
             with dbm.open(self.config['map']) as db:
                 
                 if lookup_addr not in db:
-                    self.return_code = self.EX_NOUSER
-                    return False
+                    if self.catchall_address not in db:
+                        self.return_code = self.EX_NOUSER
+                        return False
+                    else:
+                        return db[self.catchall_address].decode()
 
                 else:
                     return db[lookup_addr].decode()
@@ -158,11 +163,16 @@ class Remailer:
 
                     message.add_header("Reply-To", to + '+' + self.trigger_string + '.' + encoded_to + '.' + encoded_from + '@' + domain)
 
+            message.add_header('X-Original-To', msg['To'])
             message.replace_header('To', recipient)
 
-        message.add_header("X-Phantom-Remailer","yes")
+            message.add_header("X-Phantom-Remailer","yes")
 
-        self.message = message
+            self.message = message
+            return True
+
+        else:
+            return False
 
     def anonymize_message(self, message: email.message.EmailMessage):
         self.message = email.message.EmailMessage()
@@ -205,7 +215,6 @@ class Remailer:
                 return False
 
         else:
-            #pass
             print(self.message)
             return True
 
@@ -247,15 +256,27 @@ incoming_address@domain.com: forwarding_address@domain.com''')
             sys.exit(remailer.return_code)
 
     else:
-        message = email.message_from_file(sys.stdin,policy=policy.default)
+        try:
+            message = email.message_from_file(sys.stdin,policy=policy.default)
 
-        if remailer.detect_anonymized(message):
-            remailer.anonymize_message(message)
+            if remailer.detect_anonymized(message):
+                remailer.anonymize_message(message)
 
-        else:
-            recipient = remailer.lookup_forward()
+            else:
+                recipient = remailer.lookup_forward()
 
-            remailer.forward_message(message,recipient)
+                if recipient == False:
+                    print(remailer.last_exception)
+                    sys.exit(remailer.return_code)
+
+                ret = remailer.forward_message(message,recipient)
+                if ret != True:
+                    print('No To in message')
+                    sys.exit(remailer.EX_NOUSER)
+
+        except Exception as e:
+            print(e)
+            sys.exit(remailer.EX_TEMPFAIL)
 
         ret = remailer.send_message()
         if ret != True:
