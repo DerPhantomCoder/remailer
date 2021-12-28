@@ -45,3 +45,5 @@ When sendmail encounters an error while delivering to an agent, it will send an 
 ```
 
 It is important to properly code the return result to ensure the error messages are properly handled.
+
+The EX_TEMPFAIL return code will cause sendmail to hold the message in deferred state so it can be reprocessed, this may be the desired default in many cases.
