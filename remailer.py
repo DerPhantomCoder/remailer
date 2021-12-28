@@ -214,10 +214,17 @@ class Remailer:
 if __name__ == "__main__":
     # execute only if run as a script
     parser = argparse.ArgumentParser(
-        description='Masquerading remailer')
-    parser.add_argument('-c', '--config', dest='config')
-    parser.add_argument('--test', dest='test', action='store_true')
-    parser.add_argument('--makedb', dest='makedb', action='store_true')
+        description='Masquerading remailer',
+        formatter_class=argparse.RawTextHelpFormatter,
+        )
+    parser.add_argument('-c', '--config', required=True, dest='config', help='path to the YAML configuration file')
+    parser.add_argument('--test', dest='test', action='store_true', help='do not forward, just print to stdout')
+    parser.add_argument('--makedb', dest='makedb', action='store_true', 
+    help='''Create address alias database by executing
+remailer.py --config /path/to/config.yml --makedb < address_list
+
+The address_list file contains addresses formatted like this:
+incoming_address@domain.com: forwarding_address@domain.com''')
     args = parser.parse_args()
 
     debug=False
