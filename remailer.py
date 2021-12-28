@@ -68,7 +68,6 @@ class Remailer:
                 
                 if lookup_addr not in db:
                     self.return_code = self.EX_NOUSER
-                    self.last_exception = e
                     return False
 
                 else:
