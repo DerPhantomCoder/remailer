@@ -38,7 +38,7 @@ The pipe command looks like this:
 
 Sendmail uses a wrapper called `smrsh` to deliver mail to programs.
 
-smrsh uses a explicit permissions model to allow programs to be executed, therefore
+smrsh uses an explicit permissions model to allow programs to be executed, therefore
 you must create symlinks to `python3` and the `remailer.py` script in the
 `/etc/smrsh` directory.
 
