@@ -150,15 +150,17 @@ class Remailer:
 
     def strip_signature(self, content: str):
         buffer:str = ''
-        prev_line:str = ''
+        prev_line:str = None
 
         for line in content.splitlines(keepends=True):
-            if line.strip() == '--' and prev_line == '\r\n':
-                break
+            if prev_line == '\r\n':
+                if line.strip() == '--':
+                    break
             else:
-                prev_line = line
                 buffer = buffer + line
         
+            prev_line = line
+
         return buffer
 
     def forward_message(self, message: email.message.EmailMessage, recipient: str):
