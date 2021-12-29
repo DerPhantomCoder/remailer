@@ -153,7 +153,7 @@ class Remailer:
         prev_line:str = ''
 
         for line in content.splitlines(keepends=True):
-            if line == '--\r\n' and prev_line == '\r\n':
+            if line.strip() == '--' and prev_line == '\r\n':
                 break
             else:
                 prev_line = line
