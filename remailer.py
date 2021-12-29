@@ -211,11 +211,11 @@ class Remailer:
     def get_smtp_host(self, smtp_host: str = None):
         return smtp_host if smtp_host is not None else self.config['smtp_host']
 
-    def send_message(self, smtp_host: str = None, to: str = None):
+    def send_message(self, smtp_host: str = None, to: str = None, sender: str = None):
         if debug == False:
             try:
                 with SMTP(self.get_smtp_host(smtp_host)) as smtp:
-                    smtp.send_message(self.message, to_addrs=to)
+                    smtp.send_message(self.message, from_addr=sender, to_addrs=to)
                     return True
 
             except Exception as e:
@@ -267,6 +267,7 @@ incoming_address@domain.com: forwarding_address@domain.com''')
         try:
             message = email.message_from_file(sys.stdin,policy=policy.default)
             recipient = None
+            sender = None
 
             if remailer.detect_anonymized(message):
                 remailer.anonymize_message(message)
@@ -278,6 +279,8 @@ incoming_address@domain.com: forwarding_address@domain.com''')
                     print('No recipient found')
                     sys.exit(remailer.return_code)
 
+                sender = remailer.to_addr
+
                 ret = remailer.forward_message(message,recipient)
                 if ret != True:
                     print('No To in message')
@@ -287,7 +290,7 @@ incoming_address@domain.com: forwarding_address@domain.com''')
             print(e)
             sys.exit(remailer.EX_TEMPFAIL)
 
-        ret = remailer.send_message(to=recipient)
+        ret = remailer.send_message(sender=sender, to=recipient)
         if ret != True:
             print(remailer.last_exception)
             sys.exit(remailer.return_code)
