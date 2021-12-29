@@ -173,8 +173,7 @@ class Remailer:
 
                     message.add_header("Reply-To", to + '+' + self.trigger_string + '.' + encoded_to + '.' + encoded_from + '@' + domain)
 
-            message.add_header('Resent-From', message['To'])
-            message.replace_header('To', recipient)
+            message.add_header('Resent-To', recipient)
 
             message.add_header("X-Phantom-Remailer","yes")
 
@@ -212,11 +211,11 @@ class Remailer:
     def get_smtp_host(self, smtp_host: str = None):
         return smtp_host if smtp_host is not None else self.config['smtp_host']
 
-    def send_message(self, smtp_host: str = None):
+    def send_message(self, smtp_host: str = None, to: str = None):
         if debug == False:
             try:
                 with SMTP(self.get_smtp_host(smtp_host)) as smtp:
-                    smtp.send_message(self.message)
+                    smtp.send_message(self.message, to_addrs=to)
                     return True
 
             except Exception as e:
@@ -267,6 +266,7 @@ incoming_address@domain.com: forwarding_address@domain.com''')
     else:
         try:
             message = email.message_from_file(sys.stdin,policy=policy.default)
+            recipient = None
 
             if remailer.detect_anonymized(message):
                 remailer.anonymize_message(message)
@@ -287,7 +287,7 @@ incoming_address@domain.com: forwarding_address@domain.com''')
             print(e)
             sys.exit(remailer.EX_TEMPFAIL)
 
-        ret = remailer.send_message()
+        ret = remailer.send_message(to=recipient)
         if ret != True:
             print(remailer.last_exception)
             sys.exit(remailer.return_code)
