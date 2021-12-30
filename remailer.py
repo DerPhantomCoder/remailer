@@ -227,8 +227,8 @@ class Remailer:
         # a header to indicate the message was logged.
         if self.log_messages == True:
             with open('/tmp/message_log', 'a') as f:
-                message.set_unixfrom('From {} {}'.format(self.to_addr.decode(),time.asctime(time.gmtime())))
-                f.write(message.as_string(unixfrom=True))
+                f.write('From {} {}'.format(self.to_addr.decode(),time.asctime(time.gmtime())))
+                f.write(message.as_string())
                 f.write('\r\n')
             self.message.add_header('X-Message-Logged', 'Yes')
 
