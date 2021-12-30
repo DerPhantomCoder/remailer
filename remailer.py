@@ -11,13 +11,15 @@ from dbm import gnu as gdbm
 import sys
 import re
 import base64
-import quopri
+import tempfile
+import traceback
 
 class Remailer:
     to_addr:str = None
     from_addr:str = None
     return_code:int = None
     last_exception = None
+    log_messages:bool = False
 
     EX_USAGE       = 64      #/* command line usage error */
     EX_DATAERR     = 65      #/* data format error */
@@ -38,20 +40,34 @@ class Remailer:
     trigger_string = 'anonymize'
     catchall_address = 'catchall'
 
-    def init_log(self, log:str = None):
+    def init_log(self, log:str = None, level:int = None):
 
         if log is None:
-            filename = '/tmp/remailer.log'
+            if 'log' in self.config:
+                filename = self.config['log']
+            else:
+                filename = '/tmp/remailer.log'
         else:
             filename = log
 
-        logging.basicConfig(filename=filename, encoding='utf-8', level=logging.DEBUG)
+        if level is None:
+            if 'log_level' in self.config:
+                log_level = self.config['log_level']
+            else:
+                log_level = logging.DEBUG
+        else:
+            log_level = level
+
+        logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s', filename=filename, level=log_level)
 
     def load_config(self, path: str):
         try:
             if path is not None:
                 with open(path, "r") as f:
                     self.config = yaml.load(f, Loader=yaml.SafeLoader)
+
+                if 'log_messages' in self.config:
+                    self.log_messages = self.config['log_messages']
 
                 return True
 
@@ -62,11 +78,13 @@ class Remailer:
         except PermissionError as e:
             self.return_code = self.EX_NOPERM
             self.last_exception = e
+            logging.critical('Permission denied while opening %s', path)
             return False
 
         except Exception as e:
             self.return_code = self.EX_CONFIG
             self.last_exception = e
+            logging.critical('Error while parsing %s', path)
             return False
 
     def lookup_forward(self, address: str = None):
@@ -76,10 +94,11 @@ class Remailer:
             lookup_addr = self.to_addr
 
         try:
-            with gdbm.open(self.config['map'],'ruf') as db:
+            with gdbm.open(self.config['map'], 'ruf') as db:
                 
                 if lookup_addr not in db:
                     if self.catchall_address not in db:
+                        logging.error('Recipient not found in alias db, are you missing a catchall?: %s', lookup_addr)
                         self.return_code = self.EX_NOUSER
                         return False
                     else:
@@ -91,6 +110,7 @@ class Remailer:
         except PermissionError as e:
             self.return_code = self.EX_NOPERM
             self.last_exception = e
+            logging.critical('Permission denied while opening %s', self.config['map'])
             return False
 
         except Exception as e:
@@ -100,26 +120,30 @@ class Remailer:
 
     def makedb(self):
         try:
-            with gdbm.open(self.config['map'],'n') as db:
+            with gdbm.open(self.config['map'], 'n') as db:
                 for line in sys.stdin:
-                    (email_in,email_out)=line.split(':')
-                    db[email_in.strip()]=email_out.strip()
+                    (email_in, email_out) = line.split(':')
+                    db[email_in.strip()] = email_out.strip()
 
+            logging.info('Rebuilt alias db: %s entries added', len(db))
             return True
 
         except PermissionError as e:
             self.return_code = self.EX_NOPERM
             self.last_exception = e
+            logging.critical('Permission denied while opening %s', self.config['map'])
             return False
             
         except Exception as e:
             self.return_code = self.EX_IOERR
             self.last_exception = e
+            logging.critical('Error while building alias db')
+            logging.critical(e)
             return False
 
     def detect_anonymized(self, message: email.message.EmailMessage):
         if 'To' in message:
-            (name,addr) = email.utils.parseaddr(message['To'])
+            (name, addr) = email.utils.parseaddr(message['To'])
 
             result = re.match(r'(?P<box>[^+]+)\+(?P<extra>[^@]+)@(?P<domain>.+)', addr)
 
@@ -127,7 +151,7 @@ class Remailer:
                 encoded_addrs = result.group('extra').split('.')
 
                 if len(encoded_addrs) == 3:
-                    (trigger,encoded_to,encoded_from) = encoded_addrs
+                    (trigger, encoded_to, encoded_from) = encoded_addrs
 
                 if trigger == self.trigger_string:
                     self.to_addr = base64.b64decode(encoded_to)
@@ -142,6 +166,7 @@ class Remailer:
                 return False
 
         else: #no To header
+            logging.error('No To address in message')
             return False
 
     def encode_addr(self, address: str):
@@ -166,7 +191,7 @@ class Remailer:
     def forward_message(self, message: email.message.EmailMessage, recipient: str):
         if 'To' in message:
             (name, addr) = email.utils.parseaddr(message['To'])
-            (to,domain) = addr.split('@')
+            (to, domain) = addr.split('@')
 
             if to is not None and domain is not None:
                 if 'From' in message:
@@ -177,23 +202,35 @@ class Remailer:
 
             message.add_header('Resent-To', recipient)
 
-            message.add_header("X-Phantom-Remailer","yes")
+            message.add_header('X-Phantom-Remailer', 'Yes')
 
             self.message = message
+            logging.info('Forward %s -> %s alias: %s', message['From'], recipient, sender)
             return True
 
         else:
+            logging.error('No To address in message')
             return False
 
     def anonymize_message(self, message: email.message.EmailMessage):
         self.message = email.message.EmailMessage()
 
-        header_list = ('MIME-Version','Subject','Content-Language')
+        # This is a debugging feature to save the as-parsed input so
+        # problems can be worked out later.  Just for paranoia I added
+        # a header to indicate the message was logged.
+        if self.log_messages == True:
+            with open('/tmp/message_log', 'a') as f:
+                f.write('\nFrom ' + message['From'] + '\r\n')
+                f.write(str(message))
+                f.write('\r\n')
+            self.message.add_header('X-Message-Logged', 'Yes')
+
+        header_list = ('MIME-Version', 'Subject', 'Content-Language')
 
         headers=dict()
         for header in header_list:
             if header in message:
-                self.message.add_header(header,message.get(header))
+                self.message.add_header(header, message.get(header))
 
         self.message.add_header("From", self.to_addr.decode())
         self.message.add_header("To", self.from_addr.decode())
@@ -208,7 +245,8 @@ class Remailer:
         else:
             content = message.get_content()
 
-        self.message.set_content(self.strip_signature(content),subtype='plain',cte='quoted-printable')
+        self.message.set_content(self.strip_signature(content), subtype='plain', cte='quoted-printable')
+        logging.info('Anonymize %s as %s -> %s', message['From'], remailer.to_addr.decode(), remailer.from_addr.decode())
 
     def get_smtp_host(self, smtp_host: str = None):
         return smtp_host if smtp_host is not None else self.config['smtp_host']
@@ -223,6 +261,8 @@ class Remailer:
             except Exception as e:
                 self.return_code = self.EX_TEMPFAIL
                 self.last_exception = e
+                logging.critical('Error sending message')
+                logging.critical(e)
                 return False
 
         else:
@@ -258,6 +298,9 @@ incoming_address@domain.com: forwarding_address@domain.com''')
         print(remailer.last_exception)
         sys.exit(remailer.return_code)
 
+    if 'logging' in remailer.config and remailer.config['logging'] == True:
+        remailer.init_log()
+
     if args.makedb:
         ret = remailer.makedb()
 
@@ -267,7 +310,7 @@ incoming_address@domain.com: forwarding_address@domain.com''')
 
     else:
         try:
-            message = email.message_from_file(sys.stdin,policy=policy.default)
+            message = email.message_from_file(sys.stdin, policy=policy.default)
             recipient = None
             sender = None
 
@@ -283,16 +326,19 @@ incoming_address@domain.com: forwarding_address@domain.com''')
 
                 sender = remailer.to_addr
 
-                ret = remailer.forward_message(message,recipient)
+                ret = remailer.forward_message(message, recipient)
                 if ret != True:
                     print('No To in message')
                     sys.exit(remailer.EX_NOUSER)
 
         except Exception as e:
+            exc_text = traceback.format_exc()
+            logging.critical('Exception caught in %s:\n%s',__name__, exc_text)
             print(e)
             sys.exit(remailer.EX_TEMPFAIL)
 
         ret = remailer.send_message(sender=sender, to=recipient)
+
         if ret != True:
             print(remailer.last_exception)
             sys.exit(remailer.return_code)

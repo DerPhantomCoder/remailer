@@ -59,6 +59,10 @@ The remailer uses a YAML config with the following configuration settings:
 - map: The DBM file containing the map of the incoming and forwarding email
 addresses
 - smtp_host: The SMTP host to use as a relay for the remailer
+- log: Path to log if logging is enabled
+- logging: A boolean on/off/True/False/Yes/No to enable or disable logging
+- log_level: The log level to write to the log, 1 of DEBUG, INFO, WARNING, ERROR, CRITICAL
+- log_messages: A boolean to enable logging of messages to be anonymized.  Used for diagnosing bugs.  This adds a header to the outgoing message to inform that the message was logged.
 
 ## Address alias database
 The remailer has another option `--makedb` which creates the DBM aliases file.

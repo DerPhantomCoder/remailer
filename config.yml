@@ -1,2 +1,6 @@
 map: addresses.dbm
 smtp_host: localhost
+log: remailer.log
+logging: on
+log_level: DEBUG
+log_messages: on
