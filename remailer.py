@@ -41,24 +41,30 @@ class Remailer:
     catchall_address = 'catchall'
 
     def init_log(self, log:str = None, level:int = None):
-
-        if log is None:
-            if 'log' in self.config:
-                filename = self.config['log']
+        try:
+            if log is None:
+                if 'log' in self.config:
+                    filename = self.config['log']
+                else:
+                    filename = '/tmp/remailer.log'
             else:
-                filename = '/tmp/remailer.log'
-        else:
-            filename = log
+                filename = log
 
-        if level is None:
-            if 'log_level' in self.config:
-                log_level = self.config['log_level']
+            if level is None:
+                if 'log_level' in self.config:
+                    log_level = self.config['log_level']
+                else:
+                    log_level = logging.DEBUG
             else:
-                log_level = logging.DEBUG
-        else:
-            log_level = level
+                log_level = level
 
-        logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s', filename=filename, level=log_level)
+            logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s', filename=filename, level=log_level)
+
+            return True
+        except Exception as e:
+            self.last_exception = e
+            self.return_code = self.EX_TEMPFAIL
+            return False
 
     def load_config(self, path: str):
         try:
@@ -299,7 +305,11 @@ incoming_address@domain.com: forwarding_address@domain.com''')
         sys.exit(remailer.return_code)
 
     if 'logging' in remailer.config and remailer.config['logging'] == True:
-        remailer.init_log()
+        ret = remailer.init_log()
+
+        if ret != True:
+            print(remailer.last_exception)
+            sys.exit(remailer.return_code)
 
     if args.makedb:
         ret = remailer.makedb()
