@@ -64,6 +64,8 @@ addresses
 - log_level: The log level to write to the log, 1 of DEBUG, INFO, WARNING, ERROR, CRITICAL
 - log_messages: A boolean to enable logging of messages to be anonymized.  Used for diagnosing bugs.  This adds a header to the outgoing message to inform that the message was logged.
 
+The recommended location for the log is /var/log/mail/remailer.log.  This location is labeled as sendmail_log_t in SELinux so that the remailer has permission to write its log there.  If you choose another location you will need to configure the SELinux permissions appropriately.
+
 ## Address alias database
 The remailer has another option `--makedb` which creates the DBM aliases file.
 
@@ -122,3 +124,4 @@ When using SELinux there are a few things to consider:
 - Ensure that your configuration and aliases database are readable by user `mail`
 - Use `restorecon -Frv` on the directory where your config/alias db resides to ensure they are labeled properly
 - Run `setsebool -P domain_can_mmap_files 1` to allow the DBM library to `mmap(2)` the aliases db
+- The remailer runs as context `sendmail_t`, this means it must use the SELinux contexts defined by the Sendmail package, you can view these with `semanage fcontext -l|grep sendmail`.
