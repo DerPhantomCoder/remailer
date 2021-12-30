@@ -219,16 +219,14 @@ class Remailer:
             return False
 
     def anonymize_message(self, message: email.message.EmailMessage):
-        self.message = email.message.EmailMessage()
+        self.message = email.message.EmailMessage(policy=policy.SMTP)
 
         # This is a debugging feature to save the as-parsed input so
         # problems can be worked out later.  Just for paranoia I added
         # a header to indicate the message was logged.
         if self.log_messages == True:
             with open('/tmp/message_log', 'a') as f:
-                f.write('\nFrom ' + message['From'] + '\r\n')
-                f.write(str(message))
-                f.write('\r\n')
+                f.write(message.as_string(unixfrom=True))
             self.message.add_header('X-Message-Logged', 'Yes')
 
         header_list = ('MIME-Version', 'Subject', 'Content-Language')
@@ -320,7 +318,7 @@ incoming_address@domain.com: forwarding_address@domain.com''')
 
     else:
         try:
-            message = email.message_from_file(sys.stdin, policy=policy.default)
+            message = email.message_from_file(sys.stdin, policy=policy.SMTP)
             recipient = None
             sender = None
 
