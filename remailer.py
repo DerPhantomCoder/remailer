@@ -185,10 +185,16 @@ class Remailer:
         prev_line:str = None
 
         for line in content.splitlines(keepends=True):
-            if prev_line == '\r\n':
+            # policy.SMTP doesn't fixup RFC non-compliant messages that
+            # only have a newline line terminator
+            # RFC states line terminator is CRLF
+            if prev_line and prev_line.strip() == '':
                 if line.strip() == '--':
                     break
             else:
+                #debug formatting issues
+                #if prev_line:
+                #    print(prev_line.encode('utf-8').hex())
                 buffer = buffer + line
         
             prev_line = line
@@ -220,7 +226,7 @@ class Remailer:
             return False
 
     def anonymize_message(self, message: email.message.EmailMessage):
-        self.message = email.message.EmailMessage(policy=policy.SMTP)
+        self.message = email.message.EmailMessage(policy=policy.default)
 
         # This is a debugging feature to save the as-parsed input so
         # problems can be worked out later.  Just for paranoia I added
@@ -273,7 +279,7 @@ class Remailer:
                 return False
 
         else:
-            print(self.message)
+            #print(self.message)
             return True
 
 
@@ -321,7 +327,7 @@ incoming_address@domain.com: forwarding_address@domain.com''')
 
     else:
         try:
-            message = email.message_from_file(sys.stdin, policy=policy.SMTP)
+            message = email.message_from_file(sys.stdin, policy=policy.default)
             recipient = None
             sender = None
 
