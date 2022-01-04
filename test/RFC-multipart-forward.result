@@ -1,0 +1,42 @@
+Return-Path: <xxxxx=xxxxxxxxxxxxxxx.xxx@x.xxxxxxxxx.xxx>
+To: test_to@example.com
+From: test_from@example.com
+Subject: xxxxxxxx: xxxxxx xxxx xxxx xxxx xxxxxxx.
+Message-ID: <xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx@xxxxxxxxx.xxx>
+MIME-Version: 1.0
+Content-Type: multipart/alternative;
+ boundary="b1_MoDB80Res0qurvi5dWuwmLcGaZwU4H2bZrKbCdS2FE"
+Reply-To:
+ test_to+anonymize.dGVzdF90b0BleGFtcGxlLmNvbQ==.dGVzdF9mcm9tQGV4YW1wbGUuY29t@example.com
+Resent-To: foo@example.com
+X-Phantom-Remailer: Yes
+
+xxxx xx x xxxxx-xxxx xxxxxxx xx xxxx xxxxxx.
+
+--b1_MoDB80Res0qurvi5dWuwmLcGaZwU4H2bZrKbCdS2FE
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: quoted-printable
+
+xx xxxx xx xxxx xxxx. xxx xxx xxxx xxxxxxxx.
+
+xxx x xxxxxxx xxxx, xxxx xx% xxx xxxx xxxxx xxxx xx xxxxxxx xxxxxx.
+
+xx xxxx xxxx xxxx xxxx, xx xxxxx xxxx xx xxxxxxxxxxxx xx xxxx xxxxxxxx xx x=
+xxx xxxx. xxxx xxxx xxx xxxx x xxxxxx xxxx xxx.
+
+- xxxxxxxx xxxxxxx xx xxx xxx xxx xx xxx xxxxxx xx
+- xxxxxxx xxxx xxxxxxxx xxxx xxx xxxxxxxxx xxxxxx xxx
+- xxxx xxxx xx xxx xxxx xxxxxxx xxx xxx xxxx xxxx
+
+--b1_MoDB80Res0qurvi5dWuwmLcGaZwU4H2bZrKbCdS2FE
+Content-Type: text/html; charset=UTF-8
+Content-Transfer-Encoding: quoted-printable
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.=
+w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">=0A<html xmlns:v=3D"urn:schem=
+as-microsoft-com:vml">
+</html=
+>=0A
+
+--b1_MoDB80Res0qurvi5dWuwmLcGaZwU4H2bZrKbCdS2FE--
+

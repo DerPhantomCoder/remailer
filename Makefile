@@ -1,8 +1,18 @@
 VENV=python
 REQUIREMENTS=requirements.txt
 ACTIVATE=source $(VENV)/bin/activate 
+TEST_DIR=test
+TEST_CONFIG=--config $(TEST_DIR)/test_config.yml
+ALIASES=$(TEST_DIR)/test_addresses.dbm
+ADDRESS_LIST=$(TEST_DIR)/test_address_list
 
-all:
+.PHONY: test
+
+$(ALIASES): $(ADDRESS_LIST)
+	./remailer.py --test $(TEST_CONFIG) --makedb < $<
+
+test: $(ALIASES)
+	./remailer.py $(TEST_CONFIG) --unittest --unittestdir $(TEST_DIR)
 
 python/pyvenv.cfg:
 	mkdir -p python

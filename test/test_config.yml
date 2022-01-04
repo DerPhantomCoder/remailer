@@ -1,0 +1,3 @@
+map: test/test_addresses.dbm
+smtp_host: localhost
+logging: True

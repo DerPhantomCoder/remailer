@@ -10,10 +10,12 @@ import yaml
 from dbm import gnu as gdbm
 import time
 import sys
+import os
 import re
 import base64
 import tempfile
 import traceback
+import unittest
 
 class Remailer:
     to_addr:str = None
@@ -59,7 +61,12 @@ class Remailer:
             else:
                 log_level = level
 
-            logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s', filename=filename, level=log_level)
+            log_format='%(asctime)s - %(levelname)s - %(message)s'
+
+            if debug == False:
+                logging.basicConfig(format=log_format, filename=filename, level=log_level)
+            else:
+                logging.basicConfig(format=log_format, level=logging.DEBUG)
 
             return True
         except Exception as e:
@@ -131,8 +138,8 @@ class Remailer:
                 for line in sys.stdin:
                     (email_in, email_out) = line.split(':')
                     db[email_in.strip()] = email_out.strip()
+                logging.info('Rebuilt alias db: %s entries added', len(db))
 
-            logging.info('Rebuilt alias db: %s entries added', len(db))
             return True
 
         except PermissionError as e:
@@ -170,6 +177,7 @@ class Remailer:
 
             else: #regex not matched
                 self.to_addr = addr
+                message.set_unixfrom(addr)
                 return False
 
         else: #no To header
@@ -218,7 +226,7 @@ class Remailer:
             message.add_header('X-Phantom-Remailer', 'Yes')
 
             self.message = message
-            logging.info('Forward %s -> %s alias: %s', message['From'], recipient, sender)
+            logging.info('Forward %s -> %s alias: %s', message['From'], recipient, self.to_addr)
             return True
 
         else:
@@ -279,8 +287,121 @@ class Remailer:
                 return False
 
         else:
-            #print(self.message)
+            #print('From {} {}'.format(self.message.get_unixfrom(),time.asctime(time.gmtime())))
+            print(self.message)
             return True
+
+    def process_message(self, file, sender = None, recipient = None):
+        try:
+            message = email.message_from_file(file, policy=policy.default)
+
+            if self.detect_anonymized(message):
+                self.anonymize_message(message)
+
+            else:
+                recipient = self.lookup_forward()
+
+                if recipient == False:
+                    print('No recipient found')
+                    self.return_code = self.EX_TEMPFAIL
+                    return False
+
+                sender = remailer.to_addr
+
+                ret = self.forward_message(message, recipient)
+                if ret != True:
+                    print('No To in message')
+                    self.return_code = self.EX_NOUSER
+                    return False
+
+        except Exception as e:
+            exc_text = traceback.format_exc()
+            logging.critical('Exception caught in %s:\n%s',__name__, exc_text)
+            print(exc_text)
+            self.return_code = self.EX_TEMPFAIL
+            return False
+
+        return True
+
+    def get_message(self):
+        return self.message
+
+    def clear(self):
+        self.message.clear()
+
+    def remail(self, file):
+        sender = None
+        recipient = None
+        
+        ret = self.process_message(file, sender=sender, recipient=recipient)
+
+        if ret != True:
+            return False
+
+        ret = remailer.send_message(sender=sender, to=recipient)
+
+        if ret != True:
+            print(remailer.last_exception)
+            return False
+
+        return True
+
+
+class TestHarness(unittest.TestCase):
+    unittestdir = "test/"
+    remailer = None
+    testcases = list()
+
+    def setUp(self):
+        if self.unittestdir[-1] != '/':
+            self.unittestdir = self.unittestdir + '/'
+
+        testcases=next(os.walk(self.unittestdir), (None, None, []))[2]
+
+        for testcase in testcases:
+            filename_ext = testcase.split('.')
+
+            if len(filename_ext) == 2 and filename_ext[1] == 'test':
+                self.testcases.append(testcase)
+
+    def test_message_samples(self):
+        for testcase in self.testcases:
+
+            testcase_path = self.unittestdir + testcase
+            with open(testcase_path, 'r') as message:
+                ret = self.remailer.process_message(message)
+
+                if ret != True:
+                    print('ret',ret)
+                    print(self.remailer.last_exception)
+                    print(self.remailer.return_code)
+
+                self.assertEqual(ret, True)
+            
+            result = self.unittestdir + testcase.split('.')[0] + '.result'
+            with open(result, 'r') as f:
+                test_result = f.read()
+
+            message_under_test = self.remailer.get_message() 
+            del message_under_test['Date']
+
+            #print tacks on an extra \n, we need to emulate
+            message_text = str(message_under_test) + '\n'
+
+            #    print(prev_line.encode('utf-8').hex())
+            if message_text != test_result:
+                print(testcase_path,'failed')
+                #print('message_text',message_text)
+                #print('result',result)
+                #print('test_result',test_result)
+                #print('message_text encode',message_text.encode('utf-8').hex())
+                #print('test_result encode',test_result.encode('utf-8').hex())
+            else:
+                print(testcase_path,'passed')
+            
+            self.assertEqual(message_text, test_result)
+
+            self.remailer.clear()
 
 
 if __name__ == "__main__":
@@ -291,6 +412,8 @@ if __name__ == "__main__":
         )
     parser.add_argument('-c', '--config', required=True, dest='config', help='path to the YAML configuration file')
     parser.add_argument('--test', dest='test', action='store_true', help='do not forward, just print to stdout')
+    parser.add_argument('--unittest', dest='unittest', action='store_true', help='run unit tests')
+    parser.add_argument('--unittestdir', dest='unittestdir', help='directory where unit tests are stored')
     parser.add_argument('--makedb', dest='makedb', action='store_true', 
     help='''Create address alias database by executing
 remailer.py --config /path/to/config.yml --makedb < address_list
@@ -325,38 +448,16 @@ incoming_address@domain.com: forwarding_address@domain.com''')
             print(remailer.last_exception)
             sys.exit(remailer.return_code)
 
+    elif args.unittest and 'unittestdir' in args:
+        TestHarness.unittestdir = args.unittestdir
+        TestHarness.remailer = remailer
+
+        unittest.main(argv=[__name__])
+
     else:
-        try:
-            message = email.message_from_file(sys.stdin, policy=policy.default)
-            recipient = None
-            sender = None
-
-            if remailer.detect_anonymized(message):
-                remailer.anonymize_message(message)
-
-            else:
-                recipient = remailer.lookup_forward()
-
-                if recipient == False:
-                    print('No recipient found')
-                    sys.exit(remailer.return_code)
-
-                sender = remailer.to_addr
-
-                ret = remailer.forward_message(message, recipient)
-                if ret != True:
-                    print('No To in message')
-                    sys.exit(remailer.EX_NOUSER)
-
-        except Exception as e:
-            exc_text = traceback.format_exc()
-            logging.critical('Exception caught in %s:\n%s',__name__, exc_text)
-            print(e)
-            sys.exit(remailer.EX_TEMPFAIL)
-
-        ret = remailer.send_message(sender=sender, to=recipient)
+        ret = remailer.remail(sys.stdin)
 
         if ret != True:
-            print(remailer.last_exception)
+            print(ret,remailer.last_exception)
             sys.exit(remailer.return_code)
 
