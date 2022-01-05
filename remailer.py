@@ -210,6 +210,12 @@ class Remailer:
         return buffer
 
     def forward_message(self, message: email.message.EmailMessage, recipient: str):
+        #loop detection
+        if 'X-Phantom-Remailer' in message:
+            self.message = message
+            logging.info('Detected an already forwarded/delivered message')
+            return True
+
         if 'To' in message:
             (name, addr) = email.utils.parseaddr(message['To'])
             (to, domain) = addr.split('@')
@@ -219,9 +225,20 @@ class Remailer:
                     encoded_from = self.encode_addr(message['From'])
                     encoded_to = self.encode_addr(message['To'])
 
-                    message.add_header("Reply-To", to + '+' + self.trigger_string + '.' + encoded_to + '.' + encoded_from + '@' + domain)
+                    reply_to_header = to + '+' + self.trigger_string + '.' + encoded_to + '.' + encoded_from + '@' + domain
+                    if 'Reply-To' in message:
+                        if message['Reply-To'] != reply_to_header:
+                            message.add_header('X-Reply-To', message['Reply-To'])
+                            message.replace_header('Reply-To', reply_to_header)
 
-            message.add_header('Resent-To', recipient)
+                    else:
+                        message.add_header("Reply-To", reply_to_header)
+
+            if 'Resent-To' in message:
+                message.replace_header('Resent-To', recipient)
+
+            else:
+                message.add_header('Resent-To', recipient)
 
             message.add_header('X-Phantom-Remailer', 'Yes')
 
