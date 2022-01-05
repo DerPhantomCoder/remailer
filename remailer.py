@@ -235,6 +235,7 @@ class Remailer:
                         message.add_header("Reply-To", reply_to_header)
 
             if 'Resent-To' in message:
+                message.add_header('X-Resent-To', message['Resent-To'])
                 message.replace_header('Resent-To', recipient)
 
             else:
