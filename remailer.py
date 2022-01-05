@@ -365,6 +365,18 @@ class Remailer:
         return True
 
 
+class bcolors:
+    HEADER = '\033[95m'
+    OKBLUE = '\033[94m'
+    OKCYAN = '\033[96m'
+    OKGREEN = '\033[92m'
+    WARNING = '\033[93m'
+    FAIL = '\033[91m'
+    ENDC = '\033[0m'
+    BOLD = '\033[1m'
+    UNDERLINE = '\033[4m'
+
+
 class TestHarness(unittest.TestCase):
     unittestdir = "test/"
     remailer = None
@@ -408,14 +420,14 @@ class TestHarness(unittest.TestCase):
 
             #    print(prev_line.encode('utf-8').hex())
             if message_text != test_result:
-                print(testcase_path,'failed')
+                print(bcolors.FAIL,'✘',bcolors.ENDC,testcase_path,'failed')
                 #print('message_text',message_text)
                 #print('result',result)
                 #print('test_result',test_result)
                 #print('message_text encode',message_text.encode('utf-8').hex())
                 #print('test_result encode',test_result.encode('utf-8').hex())
             else:
-                print(testcase_path,'passed')
+                print(bcolors.OKGREEN,'✔',bcolors.ENDC,testcase_path,'passed')
             
             self.assertEqual(message_text, test_result)
 
