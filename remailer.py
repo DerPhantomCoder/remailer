@@ -213,7 +213,7 @@ class Remailer:
         #loop detection
         if 'X-Phantom-Remailer' in message:
             self.message = message
-            logging.info('Detected an already forwarded/delivered message')
+            logging.info('Detected an already forwarded message/redelivery attempt')
             return True
 
         if 'To' in message:
