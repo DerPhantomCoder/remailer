@@ -14,6 +14,9 @@ $(ALIASES): $(ADDRESS_LIST)
 test: $(ALIASES)
 	./remailer.py $(TEST_CONFIG) --unittest --unittestdir $(TEST_DIR)
 
+%.result: %.test
+	./remailer.py --test $(TEST_CONFIG) < $< 2>/dev/null | grep -v "^Date" > $@
+
 python/pyvenv.cfg:
 	mkdir -p python
 	python3 -m venv $(VENV) && $(ACTIVATE) && pip install -r $(REQUIREMENTS)
