@@ -328,7 +328,7 @@ class Remailer:
                 return False
 
         else:
-            print('From {}'.format(self.sender))
+            #print('From {}'.format(self.sender))
             print(self.message)
             return True
 
