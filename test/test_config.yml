@@ -1,3 +1,5 @@
 map: test/test_addresses.dbm
 smtp_host: localhost
 logging: True
+signing_key: BE5EDAEBD7D90169277D545EF317EF14E63B314D026DB31213A213175FE7B7C1
+auth_token: mytoken

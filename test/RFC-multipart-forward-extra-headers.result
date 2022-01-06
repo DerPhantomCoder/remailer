@@ -1,6 +1,5 @@
 Return-Path: <xxxxx=xxxxxxxxxxxxxxx.xxx@x.xxxxxxxxx.xxx>
-Reply-To:
- test_to+anonymize.dGVzdF90b0BleGFtcGxlLmNvbQ==.dGVzdF9mcm9tQGV4YW1wbGUuY29t@example.com
+Reply-To: test_to+anonymize.dGVzdF9mcm9tQGV4YW1wbGUuY29t.Oq44a54QFHCJZcUDz2iUMp18FU1j9kanMfT78YB0mMU=@example.com
 Resent-To: foo@example.com
 To: test_to@example.com
 From: test_from@example.com

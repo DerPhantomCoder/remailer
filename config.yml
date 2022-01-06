@@ -4,3 +4,5 @@ log: remailer.log
 logging: on
 log_level: DEBUG
 log_messages: on
+signing_key: 
+auth_token: 

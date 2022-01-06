@@ -6,8 +6,7 @@ Message-ID: <xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx@xxxxxxxxx.xxx>
 MIME-Version: 1.0
 Content-Type: multipart/alternative;
  boundary="b1_MoDB80Res0qurvi5dWuwmLcGaZwU4H2bZrKbCdS2FE"
-Reply-To:
-  test_to+anonymize.dGVzdF90b0BleGFtcGxlLmNvbQ==.dGVzdF9mcm9tQGV4YW1wbGUuY29t@example.com
+Reply-To:  test_to+anonymize.dGVzdF9mcm9tQGV4YW1wbGUuY29t.Oq44a54QFHCJZcUDz2iUMp18FU1j9kanMfT78YB0mMU=@example.com
 Resent-To: foo@example.com
 X-Phantom-Remailer: Yes
 

@@ -63,6 +63,8 @@ addresses
 - logging: A boolean on/off/True/False/Yes/No to enable or disable logging
 - log_level: The log level to write to the log, 1 of DEBUG, INFO, WARNING, ERROR, CRITICAL
 - log_messages: A boolean to enable logging of messages to be anonymized.  Used for diagnosing bugs.  This adds a header to the outgoing message to inform that the message was logged.
+- signing_key: A SHA256 hash token used for performing HMAC signing of the From address in the Reply-To.  This is a simple hex string you can generate at https://onlinehashtools.com/generate-random-sha256-hash or any other source.
+- auth_token: A string used in place of 'anonymize' to allow you to address new outgoing emails via the remailer.  Feature to be added.
 
 The recommended location for the log is /var/log/mail/remailer.log.  This location is labeled as sendmail_log_t in SELinux so that the remailer has permission to write its log there.  If you choose another location you will need to configure the SELinux permissions appropriately.
 

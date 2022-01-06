@@ -8,6 +8,7 @@ import logging
 import argparse
 import yaml
 from dbm import gnu as gdbm
+from os.path import exists
 import time
 import sys
 import os
@@ -16,6 +17,8 @@ import base64
 import tempfile
 import traceback
 import unittest
+import hmac
+import hashlib
 
 class Remailer:
     to_addr:str = None
@@ -162,14 +165,19 @@ class Remailer:
             result = re.match(r'(?P<box>[^+]+)\+(?P<extra>[^@]+)@(?P<domain>.+)', addr)
 
             if result:
-                encoded_addrs = result.group('extra').split('.')
+                encoded_addr = result.group('extra').split('.')
 
-                if len(encoded_addrs) == 3:
-                    (trigger, encoded_to, encoded_from) = encoded_addrs
+                if len(encoded_addr) == 3:
+                    (trigger, encoded_from, signature) = encoded_addr
 
                 if trigger == self.trigger_string:
-                    self.to_addr = base64.b64decode(encoded_to)
-                    self.from_addr = base64.b64decode(encoded_from)
+                    self.to_addr = str(result.group('box') + '@' + result.group('domain'))
+                    self.from_addr = self.decode_addr(encoded_from)
+                    if self.validate_signature(self.from_addr, base64.b64decode(signature)) != True:
+                        logging.error('Signature validation failed for %s', addr)
+                        self.return_code = self.EX_DATAERR
+                        return None
+
                     return True
 
                 else: #no trigger string match
@@ -177,16 +185,30 @@ class Remailer:
 
             else: #regex not matched
                 self.to_addr = addr
-                message.set_unixfrom(addr)
                 return False
 
         else: #no To header
             logging.error('No To address in message')
             return False
 
+    def decode_addr(self, address: str):
+        result = base64.b64decode(address).decode()
+        return result
+
     def encode_addr(self, address: str):
         (name, addr) = email.utils.parseaddr(address)
-        return base64.b64encode(addr.encode()).decode()
+        digest = base64.b64encode(self.sign_string(addr)).decode()
+        encoded_addr = base64.b64encode(addr.encode()).decode()
+        return encoded_addr + '.' + digest
+
+    def sign_string(self, message: str):
+        key = bytearray.fromhex(self.config['signing_key'])
+        auth = hmac.new(key, message.encode(), hashlib.sha256)
+        return auth.digest()
+
+    def validate_signature(self, message: str, signature: bytes):
+        digest = self.sign_string(message)
+        return hmac.compare_digest(digest, signature)
 
     def strip_signature(self, content: str):
         buffer:str = ''
@@ -223,9 +245,8 @@ class Remailer:
             if to is not None and domain is not None:
                 if 'From' in message:
                     encoded_from = self.encode_addr(message['From'])
-                    encoded_to = self.encode_addr(message['To'])
 
-                    reply_to_header = to + '+' + self.trigger_string + '.' + encoded_to + '.' + encoded_from + '@' + domain
+                    reply_to_header = to + '+' + self.trigger_string + '.' + encoded_from + '@' + domain
                     if 'Reply-To' in message:
                         if message['Reply-To'] != reply_to_header:
                             message.add_header('X-Reply-To', message['Reply-To'])
@@ -259,7 +280,7 @@ class Remailer:
         # a header to indicate the message was logged.
         if self.log_messages == True:
             with open('/tmp/message_log', 'a') as f:
-                f.write('From {} {}\r\n'.format(self.to_addr.decode(),time.asctime(time.gmtime())))
+                f.write('From {} {}\r\n'.format(self.to_addr,time.asctime(time.gmtime())))
                 f.write(message.as_string())
                 f.write('\r\n')
             self.message.add_header('X-Message-Logged', 'Yes')
@@ -271,8 +292,8 @@ class Remailer:
             if header in message:
                 self.message.add_header(header, message.get(header))
 
-        self.message.add_header("From", self.to_addr.decode())
-        self.message.add_header("To", self.from_addr.decode())
+        self.message.add_header("From", self.to_addr)
+        self.message.add_header("To", self.from_addr)
         msg_date = email.utils.formatdate(usegmt=True)
 
         self.message.add_header("Date", msg_date)
@@ -285,7 +306,7 @@ class Remailer:
             content = message.get_content()
 
         self.message.set_content(self.strip_signature(content), subtype='plain', cte='quoted-printable')
-        logging.info('Anonymize %s as %s -> %s', message['From'], remailer.to_addr.decode(), remailer.from_addr.decode())
+        logging.info('Anonymize %s as %s -> %s', message['From'], remailer.to_addr, remailer.from_addr)
 
     def get_smtp_host(self, smtp_host: str = None):
         return smtp_host if smtp_host is not None else self.config['smtp_host']
@@ -313,10 +334,11 @@ class Remailer:
         try:
             message = email.message_from_file(file, policy=policy.default)
 
-            if self.detect_anonymized(message):
+            anonymized = self.detect_anonymized(message) 
+            if  anonymized == True:
                 self.anonymize_message(message)
 
-            else:
+            elif anonymized == False:
                 recipient = self.lookup_forward()
 
                 if recipient == False:
@@ -331,6 +353,8 @@ class Remailer:
                     print('No To in message')
                     self.return_code = self.EX_NOUSER
                     return False
+            else:
+                return False
 
         except Exception as e:
             exc_text = traceback.format_exc()
@@ -394,21 +418,55 @@ class TestHarness(unittest.TestCase):
             if len(filename_ext) == 2 and filename_ext[1] == 'test':
                 self.testcases.append(testcase)
 
+    def test_hash_signature(self):
+        test_addr = 'test@example.com'
+
+        encoded_addr = remailer.encode_addr(test_addr)
+
+        (address, signature) = encoded_addr.split('.')
+
+        address = remailer.decode_addr(address)
+        signature = base64.b64decode(signature)
+
+        compare = remailer.validate_signature(address, signature)
+
+        if compare:
+            print(bcolors.OKGREEN,'✔',bcolors.ENDC,'test_hash_signature passed')
+        else:
+            print(bcolors.FAIL,'✘',bcolors.ENDC,'test_hash_signature failed')
+
+        self.assertTrue(compare)
+
     def test_message_samples(self):
+        print()
+
         for testcase in self.testcases:
 
             testcase_path = self.unittestdir + testcase
+            result = self.unittestdir + testcase.split('.')[0] + '.result'
+
             with open(testcase_path, 'r') as message:
                 ret = self.remailer.process_message(message)
 
+            #Some test cases don't have a result because they are intended to fail
+            #We take the intended result of the test case from its name
+            if not exists(result) and 'False' in testcase:
+                if ret == False:
+                    print(bcolors.OKGREEN,'✔',bcolors.ENDC,testcase_path,'passed')
+                else:
+                    print(bcolors.FAIL,'✘',bcolors.ENDC,testcase_path,'failed')
+
+                self.assertFalse(ret)
+                continue
+
+            else:
                 if ret != True:
                     print('ret',ret)
                     print(self.remailer.last_exception)
                     print(self.remailer.return_code)
 
-                self.assertEqual(ret, True)
+                self.assertTrue(ret)
             
-            result = self.unittestdir + testcase.split('.')[0] + '.result'
             with open(result, 'r') as f:
                 test_result = f.read()
 

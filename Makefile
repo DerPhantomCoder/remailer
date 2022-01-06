@@ -6,7 +6,7 @@ TEST_CONFIG=--config $(TEST_DIR)/test_config.yml
 ALIASES=$(TEST_DIR)/test_addresses.dbm
 ADDRESS_LIST=$(TEST_DIR)/test_address_list
 
-.PHONY: test
+.PHONY: test 
 
 $(ALIASES): $(ADDRESS_LIST)
 	./remailer.py --test $(TEST_CONFIG) --makedb < $<
