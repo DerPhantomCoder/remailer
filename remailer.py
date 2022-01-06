@@ -26,6 +26,8 @@ class Remailer:
     return_code:int = None
     last_exception = None
     log_messages:bool = False
+    sender:str = None
+    recipient:str = None
 
     EX_USAGE       = 64      #/* command line usage error */
     EX_DATAERR     = 65      #/* data format error */
@@ -326,11 +328,11 @@ class Remailer:
                 return False
 
         else:
-            #print('From {} {}'.format(self.message.get_unixfrom(),time.asctime(time.gmtime())))
+            print('From {}'.format(self.sender))
             print(self.message)
             return True
 
-    def process_message(self, file, sender = None, recipient = None):
+    def process_message(self, file):
         try:
             message = email.message_from_file(file, policy=policy.default)
 
@@ -339,16 +341,16 @@ class Remailer:
                 self.anonymize_message(message)
 
             elif anonymized == False:
-                recipient = self.lookup_forward()
+                self.recipient = self.lookup_forward()
 
-                if recipient == False:
+                if self.recipient == False:
                     print('No recipient found')
                     self.return_code = self.EX_TEMPFAIL
                     return False
 
-                sender = remailer.to_addr
+                self.sender = remailer.to_addr
 
-                ret = self.forward_message(message, recipient)
+                ret = self.forward_message(message, self.recipient)
                 if ret != True:
                     print('No To in message')
                     self.return_code = self.EX_NOUSER
@@ -372,15 +374,13 @@ class Remailer:
         self.message.clear()
 
     def remail(self, file):
-        sender = None
-        recipient = None
         
-        ret = self.process_message(file, sender=sender, recipient=recipient)
+        ret = self.process_message(file)
 
         if ret != True:
             return False
 
-        ret = remailer.send_message(sender=sender, to=recipient)
+        ret = remailer.send_message(sender=self.sender, to=self.recipient)
 
         if ret != True:
             print(remailer.last_exception)
