@@ -3,4 +3,5 @@ out*
 address_list
 addresses.dbm
 python/*
+python
 remailer.log
