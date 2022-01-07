@@ -47,6 +47,7 @@ class Remailer:
 
     trigger_string = 'anonymize'
     catchall_address = 'catchall'
+    required_config = ['signing_key','auth_token','smtp_host','map']
 
     def init_log(self, log:str = None, level:int = None):
         try:
@@ -88,7 +89,13 @@ class Remailer:
                 if 'log_messages' in self.config:
                     self.log_messages = self.config['log_messages']
 
-                return True
+                result = True
+                for element in self.required_config:
+                    if element not in self.config:
+                        result = False
+                        logging.error('Required variable "%s" not found in configuration file',element)
+
+                return result
 
             else:
                 self.return_code = self.EX_USAGE
@@ -106,25 +113,17 @@ class Remailer:
             logging.critical('Error while parsing %s', path)
             return False
 
-    def lookup_forward(self, address: str = None):
-        if address is not None:
-            lookup_addr = address
-        else:
-            lookup_addr = self.to_addr
-
+    def lookup_address(self, address: str = None, default: str = None):
         try:
             with gdbm.open(self.config['map'], 'ruf') as db:
                 
-                if lookup_addr not in db:
-                    if self.catchall_address not in db:
-                        logging.error('Recipient not found in alias db, are you missing a catchall?: %s', lookup_addr)
-                        self.return_code = self.EX_NOUSER
+                if address not in db:
+                    if default not in db:
                         return False
                     else:
-                        return db[self.catchall_address].decode()
-
+                        return db[default].decode()
                 else:
-                    return db[lookup_addr].decode()
+                    return db[address].decode()
 
         except PermissionError as e:
             self.return_code = self.EX_NOPERM
@@ -136,6 +135,22 @@ class Remailer:
             self.return_code = self.EX_IOERR
             self.last_exception = e
             return False
+
+    def lookup_forward(self, address: str = None):
+        lookup_addr = address
+
+        if address is None:
+            lookup_addr = self.to_addr
+
+        forward = self.lookup_address(lookup_addr, self.catchall_address)
+
+        if forward == False:
+            logging.error('Recipient not found in alias db, are you missing a catchall?: %s', address)
+            self.return_code = self.EX_NOUSER
+            return False
+
+        else:
+            return forward
 
     def makedb(self):
         try:
@@ -248,7 +263,8 @@ class Remailer:
                 if 'From' in message:
                     encoded_from = self.encode_addr(message['From'])
 
-                    reply_to_header = to + '+' + self.trigger_string + '.' + encoded_from + '@' + domain
+                    reply_to_header = f'{to}+{self.trigger_string}.{encoded_from}@{domain}'
+
                     if 'Reply-To' in message:
                         if message['Reply-To'] != reply_to_header:
                             message.add_header('X-Reply-To', message['Reply-To'])
@@ -401,7 +417,97 @@ class bcolors:
     UNDERLINE = '\033[4m'
 
 
-class TestHarness(unittest.TestCase):
+def log_result(result:bool, test:str):
+    if debug == True:
+        if result:
+            print(f'{bcolors.OKGREEN}✔{bcolors.ENDC} {test} passed')
+        else:
+            print(f'{bcolors.FAIL}✘{bcolors.ENDC} {test} failed')
+
+class TestUnits(unittest.TestCase):
+    remailer = None
+
+    def test_valid_hash_signature(self):
+        test_addr = 'test@example.com'
+
+        encoded_addr = remailer.encode_addr(test_addr)
+
+        (address, signature) = encoded_addr.split('.')
+
+        address = remailer.decode_addr(address)
+        signature = base64.b64decode(signature)
+
+        compare = remailer.validate_signature(address, signature)
+
+        log_result(compare, 'test_valid_hash_signature')
+
+        self.assertTrue(compare)
+
+    def test_invalid_hash_signature(self):
+        test_addr = 'test@example.com'
+
+        encoded_addr = remailer.encode_addr(test_addr)
+
+        (address, signature) = encoded_addr.split('.')
+
+        address = remailer.decode_addr(address)
+        signature = base64.b64decode(signature)
+
+        compare = remailer.validate_signature(address, signature + b'\xaa\x55')
+
+        log_result(compare == False, 'test_invalid_hash_signature')
+
+        self.assertFalse(compare)
+
+    def test_sign_string(self):
+        message = 'test_string@example.com'
+        digest = b'\x7f\xb6\x18NZ\x15|]\x8b\x895\x05\xa6\xb8\x03\x16xW\\@2\xb3Oi(\xd3g\x1b\xaaz\xf4U'
+
+        test = remailer.sign_string(message)
+
+        result = hmac.compare_digest(digest, test)
+
+        log_result(result, 'test_sign_string')
+
+        self.assertTrue(result)
+
+    def test_address_lookup(self):
+        address = 'test_to@example.com'
+
+        result = remailer.lookup_address(address)
+
+        log_result(result is not False, 'test_address_lookup')
+
+        self.assertTrue(result is not False)
+
+    def test_invalid_address_lookup(self):
+        result = remailer.lookup_address('invalid@example.com')
+
+        log_result(result is False, 'test_invalid_address_lookup')
+
+        self.assertFalse(result)
+
+    def test_catchall(self):
+        result = remailer.lookup_address('invalid@example.com',remailer.catchall_address)
+
+        log_result(result is not False, 'test_catchall')
+
+        self.assertTrue(result is not False)
+
+class TestConfig(unittest.TestCase):
+    unittestdir = "test/"
+
+    def test_empty_config(self):
+        remailer = Remailer()
+        remailer.init_log()
+
+        result = remailer.load_config(self.unittestdir + '/test_empty_config.yml')
+
+        log_result(result == False, 'test_empty_config')
+
+        self.assertFalse(result)
+
+class TestMessages(unittest.TestCase):
     unittestdir = "test/"
     remailer = None
     testcases = list()
@@ -418,28 +524,7 @@ class TestHarness(unittest.TestCase):
             if len(filename_ext) == 2 and filename_ext[1] == 'test':
                 self.testcases.append(testcase)
 
-    def test_hash_signature(self):
-        test_addr = 'test@example.com'
-
-        encoded_addr = remailer.encode_addr(test_addr)
-
-        (address, signature) = encoded_addr.split('.')
-
-        address = remailer.decode_addr(address)
-        signature = base64.b64decode(signature)
-
-        compare = remailer.validate_signature(address, signature)
-
-        if compare:
-            print(bcolors.OKGREEN,'✔',bcolors.ENDC,'test_hash_signature passed')
-        else:
-            print(bcolors.FAIL,'✘',bcolors.ENDC,'test_hash_signature failed')
-
-        self.assertTrue(compare)
-
     def test_message_samples(self):
-        print()
-
         for testcase in self.testcases:
 
             testcase_path = self.unittestdir + testcase
@@ -451,10 +536,7 @@ class TestHarness(unittest.TestCase):
             #Some test cases don't have a result because they are intended to fail
             #We take the intended result of the test case from its name
             if not exists(result) and 'False' in testcase:
-                if ret == False:
-                    print(bcolors.OKGREEN,'✔',bcolors.ENDC,testcase_path,'passed')
-                else:
-                    print(bcolors.FAIL,'✘',bcolors.ENDC,testcase_path,'failed')
+                log_result(ret == False, testcase)
 
                 self.assertFalse(ret)
                 continue
@@ -476,16 +558,14 @@ class TestHarness(unittest.TestCase):
             #print tacks on an extra \n, we need to emulate
             message_text = str(message_under_test) + '\n'
 
-            #    print(prev_line.encode('utf-8').hex())
-            if message_text != test_result:
-                print(bcolors.FAIL,'✘',bcolors.ENDC,testcase_path,'failed')
+            log_result(message_text == test_result, testcase)
+
+            #if message_text != test_result:
                 #print('message_text',message_text)
                 #print('result',result)
                 #print('test_result',test_result)
                 #print('message_text encode',message_text.encode('utf-8').hex())
                 #print('test_result encode',test_result.encode('utf-8').hex())
-            else:
-                print(bcolors.OKGREEN,'✔',bcolors.ENDC,testcase_path,'passed')
             
             self.assertEqual(message_text, test_result)
 
@@ -499,7 +579,7 @@ if __name__ == "__main__":
         formatter_class=argparse.RawTextHelpFormatter,
         )
     parser.add_argument('-c', '--config', required=True, dest='config', help='path to the YAML configuration file')
-    parser.add_argument('--test', dest='test', action='store_true', help='do not forward, just print to stdout')
+    parser.add_argument('--debug', dest='debug', action='store_true', help='do not forward, just print to stdout')
     parser.add_argument('--unittest', dest='unittest', action='store_true', help='run unit tests')
     parser.add_argument('--unittestdir', dest='unittestdir', help='directory where unit tests are stored')
     parser.add_argument('--makedb', dest='makedb', action='store_true', 
@@ -511,7 +591,7 @@ incoming_address@domain.com: forwarding_address@domain.com''')
     args = parser.parse_args()
 
     debug=False
-    if args.test:
+    if args.debug:
         debug=True
 
     remailer = Remailer()
@@ -537,8 +617,10 @@ incoming_address@domain.com: forwarding_address@domain.com''')
             sys.exit(remailer.return_code)
 
     elif args.unittest and 'unittestdir' in args:
-        TestHarness.unittestdir = args.unittestdir
-        TestHarness.remailer = remailer
+        TestMessages.unittestdir = args.unittestdir
+        TestConfig.unittestdir = args.unittestdir
+        TestMessages.remailer = remailer
+        TestUnits.remailer = remailer
 
         unittest.main(argv=[__name__])
 

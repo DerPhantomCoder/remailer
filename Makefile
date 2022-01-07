@@ -9,13 +9,13 @@ ADDRESS_LIST=$(TEST_DIR)/test_address_list
 .PHONY: test 
 
 $(ALIASES): $(ADDRESS_LIST)
-	./remailer.py --test $(TEST_CONFIG) --makedb < $<
+	./remailer.py --debug $(TEST_CONFIG) --makedb < $<
 
 test: $(ALIASES)
-	./remailer.py $(TEST_CONFIG) --unittest --unittestdir $(TEST_DIR)
+	./remailer.py $(ARGS) $(TEST_CONFIG) --unittest --unittestdir $(TEST_DIR)
 
 %.result: %.test
-	./remailer.py --test $(TEST_CONFIG) < $< 2>/dev/null | grep -v "^Date" > $@
+	./remailer.py --debug $(TEST_CONFIG) < $< 2>/dev/null | grep -v "^Date" > $@
 
 python/pyvenv.cfg:
 	mkdir -p python
