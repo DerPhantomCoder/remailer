@@ -517,19 +517,34 @@ class TestUnits(unittest.TestCase):
 
         self.assertTrue(result is not False)
 
-    def test_relay_encoding(self):
+    def test_relay_encoding_single_domain(self):
         a = 'foo@example.com'
         y = (
             'foo_at_example_dot_com',
             'foo=40example=2Ecom',
             'foo%40example%2ecom',
-            'foo%40example%2Ecom'
+            'foo%40example%2Ecom',
             )
 
         for x in y:
             b = remailer.decode_relay_address(x)
 
-            log_result(a==b, f'test_relay_encoding {x}')
+            log_result(a==b, f'test_relay_encoding_single_domain {x}')
+            self.assertEqual(a, b)
+
+    def test_relay_encoding_subdomain(self):
+        a = 'foo@subdomain.example.com'
+        y = (
+            'foo_at_subdomain_dot_example_dot_com',
+            'foo=40subdomain=2Eexample=2Ecom',
+            'foo%40subdomain%2eexample%2ecom',
+            'foo%40subdomain%2Eexample%2Ecom',
+            )
+
+        for x in y:
+            b = remailer.decode_relay_address(x)
+
+            log_result(a==b, f'test_relay_encoding_subdomain {x}')
             self.assertEqual(a, b)
 
 class TestConfig(unittest.TestCase):
