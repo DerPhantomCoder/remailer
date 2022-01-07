@@ -175,6 +175,17 @@ class Remailer:
             logging.critical(e)
             return False
 
+    def check_auth_token(self, token:str, address:str = None):
+        return token == self.config['auth_token']
+
+    def decode_relay_address(self, address:str):
+        replacements = (('_at_','@'),('%40','@'),('=40','@'),('_dot_','.'),('%2e','.'),('%2E','.'),('=2E','.'))
+
+        for (a,b) in replacements:
+            address = address.replace(a,b)
+
+        return address
+
     def detect_anonymized(self, message: email.message.EmailMessage):
         if 'To' in message:
             (name, addr) = email.utils.parseaddr(message['To'])
@@ -186,6 +197,8 @@ class Remailer:
 
                 if len(encoded_addr) == 3:
                     (trigger, encoded_from, signature) = encoded_addr
+                elif len(encoded_addr) == 2:
+                    (trigger, encoded_to) = encoded_addr
 
                 if trigger == self.trigger_string:
                     self.to_addr = str(result.group('box') + '@' + result.group('domain'))
@@ -197,8 +210,18 @@ class Remailer:
 
                     return True
 
-                else: #no trigger string match
-                    return False
+                else:
+                    #to and from are reversed here due to context of encoded data in header
+                    #the to_addr will be the sender and the from_addr will be the recipient
+                    self.to_addr = str(result.group('box') + '@' + result.group('domain'))
+
+                    if self.check_auth_token(trigger, self.to_addr):
+                        self.from_addr = self.decode_relay_address(encoded_to)
+
+                        return True
+                    else:
+                        logging.info('Auth token did not match: %s %s', self.to_addr, trigger)
+                        return False
 
             else: #regex not matched
                 self.to_addr = addr
@@ -493,6 +516,21 @@ class TestUnits(unittest.TestCase):
         log_result(result is not False, 'test_catchall')
 
         self.assertTrue(result is not False)
+
+    def test_relay_encoding(self):
+        a = 'foo@example.com'
+        y = (
+            'foo_at_example_dot_com',
+            'foo=40example=2Ecom',
+            'foo%40example%2ecom',
+            'foo%40example%2Ecom'
+            )
+
+        for x in y:
+            b = remailer.decode_relay_address(x)
+
+            log_result(a==b, f'test_relay_encoding {x}')
+            self.assertEqual(a, b)
 
 class TestConfig(unittest.TestCase):
     unittestdir = "test/"
