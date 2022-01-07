@@ -97,6 +97,35 @@ To create the address aliases DBM, simply execute this command:
 
 `remailer.py --config /path/to/your/config.yml --makedb < address_list`
 
+## Relaying
+The remailer allows you to relay new messages through the remailer by use of a secret
+token.
+
+To relay a message you need to define `auth_token` in the config file, this can be
+any word or sequence that does not contain `@`, `.`, or `+`.
+
+The email address of the recipient must be encoded to be able to pass to the remailer,
+this is done by replacing the `@` and `.` with the following possible encodings:
+
+- `@`: `_at_`, `%40`, `=40`
+- `.`: `_dot_`, `%2e`, `%2E`, `=2E`
+
+The resulting `To` address you would use looks like this:
+
+`box+<token>.foo_at_example_dot_com@domain`
+
+If your `auth_token` is the word `automobile` and your alias is `alias@example.com`, then
+an email addressed to `foo@example.com` would be addressed like this:
+
+`alias+automobile.foo_at_example_dot_com@example.com`
+
+You can mix and match the escapes, so `_at_` could be combined with `=2E` like this:
+
+`foo_at_example=2Ecom`
+
+The `=40` and `=2E` syntax is what quoted-printable encoding uses to represent characters
+in hexadecimal, it is commonly used in email.
+
 ## Errors
 The remailer implements the Sendmail standard return codes used by mail delivery
 agents.  These are found in `/usr/include/sysexits.h` but have no Python
