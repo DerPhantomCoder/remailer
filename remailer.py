@@ -599,21 +599,21 @@ incoming_address@domain.com: forwarding_address@domain.com''')
     ret = remailer.load_config(args.config)
 
     if ret != True:
-        print(remailer.last_exception)
+        logging.error('Exception: ',remailer.last_exception)
         sys.exit(remailer.return_code)
 
     if 'logging' in remailer.config and remailer.config['logging'] == True:
         ret = remailer.init_log()
 
         if ret != True:
-            print(remailer.last_exception)
+            logging.error('Exception: ',remailer.last_exception)
             sys.exit(remailer.return_code)
 
     if args.makedb:
         ret = remailer.makedb()
 
         if ret != True:
-            print(remailer.last_exception)
+            logging.error('Exception: ',remailer.last_exception)
             sys.exit(remailer.return_code)
 
     elif args.unittest and 'unittestdir' in args:
@@ -628,6 +628,6 @@ incoming_address@domain.com: forwarding_address@domain.com''')
         ret = remailer.remail(sys.stdin)
 
         if ret != True:
-            print(ret,remailer.last_exception)
+            logging.error('Exception: ',remailer.last_exception)
             sys.exit(remailer.return_code)
 
